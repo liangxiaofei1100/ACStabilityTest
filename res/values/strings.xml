@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">StabilityTest External</string>
+    <string name="readme">Communication stability test.\n
+			Client every 100ms send message to server. \n
+			Server show the received data and write to log file, then send the received data return to clients.\n
+			Clients show the received data from server and write to log file.</string>
+    <string name="send_to_all">Send to all</string>
+    <string name="send_to_single">Send to single</string>
+    <string name="message_size">Message size of send</string>
+
+</resources>
