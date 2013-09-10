@@ -2,38 +2,30 @@ package com.dreamlink.communication.statbilitytest;
 
 import java.util.ArrayList;
 
+import com.dreamlink.communication.aidl.User;
+import com.dreamlink.communication.lib.CommunicationManager;
+import com.dreamlink.communication.lib.CommunicationManager.OnCommunicationListener;
+import com.dreamlink.communication.lib.CommunicationManager.OnConnectionChangeListener;
+
 import android.app.Activity;
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Message;
-import android.os.RemoteException;
+import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
-import com.dreamlink.aidl.Communication;
-import com.dreamlink.aidl.OnCommunicationListenerExternal;
-import com.dreamlink.aidl.User;
-import com.dreamlink.communication.api.CommunicateService;
-import com.dreamlink.communication.api.Log;
-import com.dreamlink.communication.api.LogFile;
-import com.dreamlink.communication.api.TimeUtil;
-
 /**
- * see {@code AndroidCommunicationStabilityTestActivity}.
+ * see {@code StabilityTestActivity}.
  * 
  */
-public class StabilityTestServer extends Activity {
+public class StabilityTestServer extends Activity implements
+		OnCommunicationListener, OnConnectionChangeListener {
 	private static final String TAG = "StabilityTestServer";
 	private ListView mListView;
 	private ArrayAdapter<String> mAdapter;
 	private ArrayList<String> mData;
-	private LogFile mDataLogFile;
-	private LogFile mErrorLogFile;
 
 	/** Stability test app id */
 	private int mAppID = 0;
@@ -43,20 +35,13 @@ public class StabilityTestServer extends Activity {
 		super.onCreate(savedInstanceState);
 
 		Intent intent = getIntent();
-		mAppID = intent.getIntExtra(
-				AndroidCommunicationStabilityTestActivity.EXTRA_APP_ID, 0);
+		mAppID = intent.getIntExtra(StabilityTestActivity.EXTRA_APP_ID, 0);
 
 		initView();
 
-		connectCommunicationService();
-		mDataLogFile = new LogFile(getApplicationContext(),
-				"StabilityTestServer-" + TimeUtil.getCurrentTime() + ".txt");
-		mDataLogFile.open();
-
-		mErrorLogFile = new LogFile(getApplicationContext(),
-				"StabilityTestServer_error-" + TimeUtil.getCurrentTime()
-						+ ".txt");
-		mErrorLogFile.open();
+		mCommunicationManager = new CommunicationManager(
+				getApplicationContext());
+		mCommunicationManager.connectCommunicatonService(this, this, mAppID);
 	}
 
 	private void initView() {
@@ -82,10 +67,7 @@ public class StabilityTestServer extends Activity {
 			}
 			mData.add(messageString);
 			mAdapter.notifyDataSetChanged();
-			mDataLogFile.writeLog(TimeUtil.getCurrentTime() + " Received: \n");
-			mDataLogFile.writeLog(messageString);
 
-			// mCommunicationManager.sendMessage(messageString.getBytes(), 0);
 			sendMessageToAll(messageString.getBytes());
 		};
 	};
@@ -93,12 +75,11 @@ public class StabilityTestServer extends Activity {
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-		disconnectService();
+		mCommunicationManager.disconnectCommunicationService();
 	}
 
 	// Communication Service begin
-	private Communication mCommunication;
-	private ServiceConnection mServiceConnection;
+	private CommunicationManager mCommunicationManager;
 
 	private void sendMessageToSingle(byte[] data, User user) {
 		sendMessage(data, user);
@@ -109,83 +90,43 @@ public class StabilityTestServer extends Activity {
 	}
 
 	private void sendMessage(byte[] data, User user) {
-		try {
-			mCommunication.sendMessage(data, mAppID, user);
-		} catch (RemoteException e) {
-			e.printStackTrace();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		mCommunicationManager.sendMessage(data, mAppID, user);
 	}
 
-	private boolean connectCommunicationService() {
-		mServiceConnection = new ServiceConnection() {
+	@Override
+	public void onCommunicationDisconnected() {
+		// TODO Auto-generated method stub
 
-			public void onServiceDisconnected(ComponentName name) {
-				try {
-					mCommunication
-							.unRegistListenr(mCommunicationListenerExternal);
-				} catch (RemoteException e) {
-					e.printStackTrace();
-				}
-
-			}
-
-			public void onServiceConnected(ComponentName name, IBinder service) {
-				mCommunication = Communication.Stub.asInterface(service);
-				try {
-					mCommunication.registListenr(
-							mCommunicationListenerExternal, mAppID);
-				} catch (RemoteException e) {
-					e.printStackTrace();
-				}
-			}
-		};
-		Intent communicateIntent = new Intent(
-				CommunicateService.ACTION_COMMUNICATE_SERVICE);
-		return bindService(communicateIntent, mServiceConnection,
-				Context.BIND_AUTO_CREATE);
 	}
 
-	private void disconnectService() {
-		if (mCommunication != null) {
-			try {
-				mCommunication.unRegistListenr(mCommunicationListenerExternal);
-			} catch (RemoteException e) {
-				e.printStackTrace();
-			}
-		}
-		if (mServiceConnection != null) {
-			unbindService(mServiceConnection);
-		}
+	@Override
+	public void onCommunicationConnected() {
+		// TODO Auto-generated method stub
+
 	}
 
-	private OnCommunicationListenerExternal mCommunicationListenerExternal = new OnCommunicationListenerExternal.Stub() {
-
-		@Override
-		public void onUserDisconnected(User user) throws RemoteException {
-			// TODO Auto-generated method stub
-
+	@Override
+	public void onReceiveMessage(byte[] msg, User sendUser) {
+		if (sendUser == null) {
+			Log.d(TAG, "User is lost connection.");
+			return;
 		}
+		Message message = mHandler.obtainMessage();
+		message.obj = "From " + sendUser.getUserName() + ": " + new String(msg);
+		mHandler.sendMessage(message);
 
-		@Override
-		public void onUserConnected(User user) throws RemoteException {
-			// TODO Auto-generated method stub
+	}
 
-		}
+	@Override
+	public void onUserConnected(User user) {
+		// TODO Auto-generated method stub
 
-		@Override
-		public void onReceiveMessage(byte[] msg, User sendUser)
-				throws RemoteException {
-			if (sendUser == null) {
-				Log.d(TAG, "User is lost connection.");
-				return;
-			}
-			Message message = mHandler.obtainMessage();
-			message.obj = "From " + sendUser.getUserName() + ": "
-					+ new String(msg);
-			mHandler.sendMessage(message);
-		}
-	};
+	}
+
+	@Override
+	public void onUserDisconnected(User user) {
+		// TODO Auto-generated method stub
+
+	}
 	// Communication Service end
 }

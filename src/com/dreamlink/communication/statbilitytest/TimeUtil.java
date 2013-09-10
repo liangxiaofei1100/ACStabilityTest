@@ -1,4 +1,4 @@
-package com.dreamlink.communication.api;
+package com.dreamlink.communication.statbilitytest;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;

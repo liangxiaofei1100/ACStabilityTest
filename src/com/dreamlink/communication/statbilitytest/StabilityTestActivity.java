@@ -1,6 +1,6 @@
 package com.dreamlink.communication.statbilitytest;
 
-import com.dreamlink.communication.api.AppUtil;
+import com.dreamlink.communication.lib.util.AppUtil;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -13,13 +13,13 @@ import android.view.MenuItem;
  * 
  * Client every 100ms send message to server. </br>
  * 
- * Server show the received data and write to log file, then send the received
- * data return to clients.</br>
+ * Server show the received data then send the received data return to
+ * clients.</br>
  * 
- * Clients show the received data from server and write to log file.
+ * Clients show the received data from server.
  * 
  */
-public class AndroidCommunicationStabilityTestActivity extends Activity {
+public class StabilityTestActivity extends Activity {
 	public static final String EXTRA_APP_ID = "app_id";
 
 	@Override
